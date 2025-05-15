@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, fs::File, io::Read, path::PathBuf};
+use std::{collections::BTreeSet, fs::File, io::Read, ops::Range, path::PathBuf};
 
 use gherkin::{Feature, Span};
 use git2::{Diff, DiffOptions, Repository};
@@ -6,40 +6,58 @@ use git2::{Diff, DiffOptions, Repository};
 pub fn changed_test_numbers(repo: &Repository) -> Vec<u32> {
     let mut opts = DiffOptions::default();
     opts.patience(true).context_lines(0);
-    let diff = repo.diff_index_to_workdir(None, Some(&mut opts)).unwrap();
+
+    let head = repo
+        .resolve_reference_from_short_name("HEAD")
+        .unwrap()
+        .peel_to_commit()
+        .unwrap();
+    let tree = head.tree().unwrap();
+
+    let diff = repo
+        .diff_tree_to_index(Some(&tree), None, Some(&mut opts))
+        .unwrap();
 
     let changes = changes_in_tests(diff);
 
     let mut numbers = Vec::new();
 
     for change in &changes {
-        if change.version == Version::Old {
-            // TODO(Johannes Pieger,2025-05-14): Parse old file
-            println!("Skipping {change:?}");
-            continue;
-        }
-        let full_path = repo.path().parent().unwrap().join(&change.path);
-        let mut text = String::new();
-        File::open(&full_path)
-            .unwrap()
-            .read_to_string(&mut text)
-            .unwrap();
+        let text = if change.version == Version::Old {
+            let blob = tree
+                .get_path(&change.path)
+                .unwrap()
+                .to_object(repo)
+                .unwrap()
+                .peel_to_blob()
+                .unwrap();
+            let text = String::from_utf8_lossy(blob.content());
+            text.to_string()
+        } else {
+            let full_path = repo.path().parent().unwrap().join(&change.path);
+            let mut text = String::new();
+            File::open(&full_path)
+                .unwrap()
+                .read_to_string(&mut text)
+                .unwrap();
+            text
+        };
 
         let feature = Feature::parse(&text, Default::default()).unwrap();
 
-        let offsets = calculate_line_offsets(&text);
-        let changed_line = line_to_byte_offset(offsets, change.line);
+        let offsets = calculate_line_spans(&text);
+        let changed_line = line_to_byte_offset(offsets.clone(), change.line);
 
         // Check scenarios
         let scenario = feature
             .scenarios
             .iter()
-            .find(|s| s.span.contains(changed_line));
+            .find(|s| s.span.intersects(&changed_line));
         if let Some(scenario) = scenario {
             let testcase = scenario
                 .tags
                 .iter()
-                .find_map(|tag| parse_testcase_number(&tag));
+                .find_map(|tag| parse_testcase_number(tag));
             if let Some(num) = testcase {
                 numbers.push(num);
             }
@@ -47,12 +65,12 @@ pub fn changed_test_numbers(repo: &Repository) -> Vec<u32> {
 
         // Check background
         if let Some(background) = feature.background {
-            if background.span.contains(changed_line) {
+            if background.span.intersects(&changed_line) {
                 numbers.extend(
                     feature
                         .scenarios
                         .iter()
-                        .filter_map(|s| s.tags.iter().find_map(|tag| parse_testcase_number(&tag))),
+                        .filter_map(|s| s.tags.iter().find_map(|tag| parse_testcase_number(tag))),
                 );
             }
         }
@@ -72,7 +90,7 @@ pub fn changed_test_numbers(repo: &Repository) -> Vec<u32> {
 pub fn print_issue_references(numbers: &[u32], width: usize, prefix: &str) {
     let mut lines = Vec::new();
 
-    assert!(prefix.len() < width as usize);
+    assert!(prefix.len() < width);
 
     let delimiter = ", ";
 
@@ -81,7 +99,7 @@ pub fn print_issue_references(numbers: &[u32], width: usize, prefix: &str) {
     for num in numbers {
         let ref_text = format!("#{num}");
 
-        let extra_width = ref_text.len() + print_delimiter.then(|| delimiter.len()).unwrap_or(0);
+        let extra_width = ref_text.len() + if print_delimiter { delimiter.len() } else { 0 };
 
         if current_line.len() + extra_width > width {
             lines.push(current_line);
@@ -106,6 +124,7 @@ pub fn print_issue_references(numbers: &[u32], width: usize, prefix: &str) {
 
 #[derive(Debug, Clone)]
 struct Change {
+    /// Line number where the change happened, 1 based
     pub line: u32,
     pub path: PathBuf,
     /// Whether to check the previous or changed version of the file.
@@ -183,6 +202,9 @@ fn changes_in_tests(diff: Diff) -> Vec<Change> {
 
 trait SpanExt {
     fn contains(&self, val: usize) -> bool;
+    fn intersects(&self, other: &Range<usize>) -> bool {
+        self.contains(other.start) || self.contains(other.end)
+    }
 }
 
 impl SpanExt for Span {
@@ -191,15 +213,18 @@ impl SpanExt for Span {
     }
 }
 
-type LineOffsets = Vec<usize>;
-fn line_to_byte_offset(offsets: LineOffsets, line: u32) -> usize {
-    offsets[(line) as usize]
+type LineOffsets = Vec<Range<usize>>;
+fn line_to_byte_offset(offsets: LineOffsets, line: u32) -> Range<usize> {
+    offsets[(line - 1) as usize].clone()
 }
 
-fn calculate_line_offsets(text: &str) -> LineOffsets {
+fn calculate_line_spans(text: &str) -> LineOffsets {
+    let mut ptr = 0;
     text.split_inclusive('\n')
-        .fold(vec![0], |mut offsets, line| {
-            offsets.push(offsets.last().unwrap() + line.len());
+        .fold(vec![], |mut offsets, line| {
+            let end = ptr + line.len() + 1;
+            offsets.push(ptr..end);
+            ptr = end;
             offsets
         })
 }

@@ -13,7 +13,7 @@ pub struct TestRepository {
 impl TestRepository {
     pub fn new() -> Self {
         let location = TempDir::with_prefix("scenario-number-test-").unwrap();
-        let git_repo = Repository::init(dbg!(&location)).unwrap();
+        let git_repo = Repository::init(&location).unwrap();
 
         Self { git_repo, location }
     }
@@ -40,10 +40,12 @@ impl TestRepository {
         file.write_all(lines_before.as_bytes()).unwrap();
 
         self.git(&["add", name]);
-        self.git(&["commit", "-m", "Create file", "--no-verify"]);
+        self.git(&["commit", "-m", "Create file", "--no-verify", "--", name]);
 
         let mut file = File::create(self.location.path().join(name)).unwrap();
         file.write_all(lines_after.as_bytes()).unwrap();
+
+        self.git(&["add", name]);
     }
 
     pub fn git_repo(&self) -> &Repository {
@@ -51,13 +53,19 @@ impl TestRepository {
     }
 
     /// Run a git command
-    fn git(&self, cmd: &[&str]) {
-        let status = Command::new("git")
+    pub fn git(&self, cmd: &[&str]) {
+        let output = Command::new("git")
+            .args(["-c", "commit.gpgsign=false"])
             .args(cmd)
             .current_dir(&self.location)
-            .status()
+            .output()
             .unwrap();
-        assert!(status.success());
+        if !output.status.success() {
+            panic!(
+                "Git command failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
     }
 }
 
