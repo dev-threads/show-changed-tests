@@ -3,9 +3,15 @@ use std::{collections::BTreeSet, fs::File, io::Read, ops::Range, path::PathBuf};
 use gherkin::{Feature, Span};
 use git2::{Diff, DiffOptions, Repository};
 
-pub fn changed_test_numbers(repo: &Repository) -> Vec<u32> {
-    let mut opts = DiffOptions::default();
-    opts.patience(true).context_lines(0);
+/// User configuration to affect the behaviour.
+pub struct Options {
+    /// Prefix used in tags to link the test case to an item.
+    pub test_prefix: String,
+}
+
+pub fn changed_test_numbers(repo: &Repository, opts: &Options) -> Vec<u32> {
+    let mut diff_opts = DiffOptions::default();
+    diff_opts.patience(true).context_lines(0);
 
     let head = repo
         .resolve_reference_from_short_name("HEAD")
@@ -15,7 +21,7 @@ pub fn changed_test_numbers(repo: &Repository) -> Vec<u32> {
     let tree = head.tree().unwrap();
 
     let diff = repo
-        .diff_tree_to_index(Some(&tree), None, Some(&mut opts))
+        .diff_tree_to_index(Some(&tree), None, Some(&mut diff_opts))
         .unwrap();
 
     let changes = changes_in_tests(diff);
@@ -57,7 +63,7 @@ pub fn changed_test_numbers(repo: &Repository) -> Vec<u32> {
             let testcase = scenario
                 .tags
                 .iter()
-                .find_map(|tag| parse_testcase_number(tag));
+                .find_map(|tag| parse_testcase_number(tag, &opts.test_prefix));
             if let Some(num) = testcase {
                 numbers.push(num);
             }
@@ -66,12 +72,11 @@ pub fn changed_test_numbers(repo: &Repository) -> Vec<u32> {
         // Check background
         if let Some(background) = feature.background {
             if background.span.intersects(&changed_line) {
-                numbers.extend(
-                    feature
-                        .scenarios
+                numbers.extend(feature.scenarios.iter().filter_map(|s| {
+                    s.tags
                         .iter()
-                        .filter_map(|s| s.tags.iter().find_map(|tag| parse_testcase_number(tag))),
-                );
+                        .find_map(|tag| parse_testcase_number(tag, &opts.test_prefix))
+                }));
             }
         }
     }
@@ -229,6 +234,14 @@ fn calculate_line_spans(text: &str) -> LineOffsets {
         })
 }
 
-fn parse_testcase_number(tag: &str) -> Option<u32> {
-    tag.strip_prefix("tc:")?.parse().ok()
+fn parse_testcase_number(tag: &str, prefix: &str) -> Option<u32> {
+    tag.strip_prefix(prefix)?.parse().ok()
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            test_prefix: "tc:".into(),
+        }
+    }
 }

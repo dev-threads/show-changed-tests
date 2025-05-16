@@ -3,12 +3,25 @@ mod common;
 use common::*;
 use show_changed_tests::changed_test_numbers;
 
+fn check(files: &[(&'static str, &'static str)], numbers: &[u32]) {
+    let mut repo = TestRepository::new();
+
+    for (name, content) in files {
+        repo.add_file(name, content);
+    }
+
+    assert_eq!(
+        &changed_test_numbers(repo.git_repo(), &Default::default()),
+        numbers
+    );
+}
+
 #[test]
 fn test_single_change_in_scenario() {
-    let mut repo = TestRepository::new();
-    repo.add_file(
-        "SimpleChange.feature",
-        "
+    check(
+        &[(
+            "SimpleChange.feature",
+            "
         Feature: Detect single change in scenario
 
         @tc:12345
@@ -18,17 +31,17 @@ fn test_single_change_in_scenario() {
           +When this line is changed
           Then 12345 is in the output
         ",
+        )],
+        &[12345],
     );
-
-    assert_eq!(changed_test_numbers(repo.git_repo()), vec![12345]);
 }
 
 #[test]
 fn change_in_last_line_is_detected() {
-    let mut repo = TestRepository::new();
-    repo.add_file(
-        "SimpleChange.feature",
-        "
+    check(
+        &[(
+            "SimpleChange.feature",
+            "
         Feature: Detect single change in scenario
 
         @tc:12345
@@ -36,19 +49,18 @@ fn change_in_last_line_is_detected() {
           Given a simple test scenario with number 12345
           When a line is changed
           Then 12345 is in the output
-          + And nothing explodes"
-          ,
+          + And nothing explodes",
+        )],
+        &[12345],
     );
-
-    assert_eq!(changed_test_numbers(repo.git_repo()), vec![12345]);
 }
 
 #[test]
 fn test_multiple_changes_in_scenario() {
-    let mut repo = TestRepository::new();
-    repo.add_file(
-        "SimpleChange.feature",
-        "
+    check(
+        &[(
+            "SimpleChange.feature",
+            "
         Feature: Detect multiple changes in scenario
 
         @tc:12345
@@ -59,17 +71,17 @@ fn test_multiple_changes_in_scenario() {
           +When this line is changed
           Then 12345 is in the output
         ",
+        )],
+        &[12345],
     );
-
-    assert_eq!(changed_test_numbers(repo.git_repo()), vec![12345]);
 }
 
 #[test]
 fn test_step_is_added() {
-    let mut repo = TestRepository::new();
-    repo.add_file(
-        "SimpleChange.feature",
-        "
+    check(
+        &[(
+            "SimpleChange.feature",
+            "
         Feature: A new step is added in a scenario
 
         @tc:12345
@@ -79,17 +91,17 @@ fn test_step_is_added() {
           +And this line is new
           Then 12345 is in the output
         ",
+        )],
+        &[12345],
     );
-
-    assert_eq!(changed_test_numbers(repo.git_repo()), vec![12345]);
 }
 
 #[test]
 fn test_step_is_removed() {
-    let mut repo = TestRepository::new();
-    repo.add_file(
-        "SimpleChange.feature",
-        "
+    check(
+        &[(
+            "SimpleChange.feature",
+            "
         Feature: An old step is removed in a scenario
 
         @tc:12345
@@ -99,17 +111,17 @@ fn test_step_is_removed() {
           -And this line is removed
           Then 12345 is in the output
         ",
+        )],
+        &[12345],
     );
-
-    assert_eq!(changed_test_numbers(repo.git_repo()), vec![12345]);
 }
 
 #[test]
 fn test_single_change_in_multiple_scenarios() {
-    let mut repo = TestRepository::new();
-    repo.add_file(
-        "SimpleChange.feature",
-        "
+    check(
+        &[(
+            "SimpleChange.feature",
+            "
         Feature: Detect multiple changes in scenario
 
         @tc:111
@@ -128,17 +140,18 @@ fn test_single_change_in_multiple_scenarios() {
           +When this line is changed
           Then 222 is in the output
         ",
+        )],
+        &[111, 222],
     );
-
-    assert_eq!(changed_test_numbers(repo.git_repo()), vec![111, 222]);
 }
 
 #[test]
 fn test_change_in_single_file() {
-    let mut repo = TestRepository::new();
-    repo.add_file(
-        "Changed.feature",
-        "
+    check(
+        &[
+            (
+                "Changed.feature",
+                "
         Feature: Detect single change in scenario
 
         @tc:111
@@ -148,10 +161,10 @@ fn test_change_in_single_file() {
           +When this line is changed
           Then 111 is in the output
         ",
-    );
-    repo.add_file(
-        "Unchanged.feature",
-        "
+            ),
+            (
+                "Unchanged.feature",
+                "
         Feature: Ignore file that was not changed
 
         @tc:222
@@ -160,9 +173,10 @@ fn test_change_in_single_file() {
           When nothing is changed
           Then 222 is not in the output
         ",
+            ),
+        ],
+        &[111],
     );
-
-    assert_eq!(changed_test_numbers(repo.git_repo()), vec![111]);
 }
 
 #[test]
@@ -196,15 +210,18 @@ fn unstaged_changes_are_not_included() {
     );
     repo.git(&["reset", "Unstaged.feature"]);
 
-    assert_eq!(changed_test_numbers(repo.git_repo()), vec![111]);
+    assert_eq!(
+        changed_test_numbers(repo.git_repo(), &Default::default()),
+        vec![111]
+    );
 }
 
 #[test]
 fn test_unchanged_scenario_is_not_listed() {
-    let mut repo = TestRepository::new();
-    repo.add_file(
-        "SimpleChange.feature",
-        "
+    check(
+        &[(
+            "SimpleChange.feature",
+            "
         Feature: Don't list unchanged scenario
 
         @tc:111
@@ -226,17 +243,17 @@ fn test_unchanged_scenario_is_not_listed() {
           When it is not touched
           Then 333 is not in the output
         ",
+        )],
+        &[222],
     );
-
-    assert_eq!(changed_test_numbers(repo.git_repo()), vec![222]);
 }
 
 #[test]
 fn test_background_change_affects_all_scenarios() {
-    let mut repo = TestRepository::new();
-    repo.add_file(
-        "SimpleChange.feature",
-        "
+    check(
+        &[(
+            "SimpleChange.feature",
+            "
         Feature: Background change affects all scenarios
 
         Background:
@@ -264,19 +281,19 @@ fn test_background_change_affects_all_scenarios() {
           And the background has changed
           Then 333 is in the output
         ",
+        )],
+        &[111, 222, 333],
     );
-
-    assert_eq!(changed_test_numbers(repo.git_repo()), vec![111, 222, 333]);
 }
 
 /// Known issue, the span information does not include the tags at the beginning of the scenario.
 #[test]
 #[should_panic]
 fn test_scenario_number_changes() {
-    let mut repo = TestRepository::new();
-    repo.add_file(
-        "SimpleChange.feature",
-        "
+    check(
+        &[(
+            "SimpleChange.feature",
+            "
         Feature: Detect simple changes in scenario
 
         +@tc:56789
@@ -286,9 +303,9 @@ fn test_scenario_number_changes() {
           When the number is changed
           Then 12345 and 56789 are in the output
         ",
+        )],
+        &[12345, 56789],
     );
-
-    assert_eq!(changed_test_numbers(repo.git_repo()), vec![12345, 56789]);
 }
 
 /// This test reproduces a bug in the gherkin parsing library.
@@ -317,7 +334,6 @@ fn repro_span_issue() {
             When I extract then span
             Then the text referenced by the span is this scenario
         ";
-
 
     assert_eq!(&text[span.start..span.end], scenario);
 }
