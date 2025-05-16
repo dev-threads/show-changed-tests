@@ -92,7 +92,7 @@ pub fn changed_test_numbers(repo: &Repository, opts: &Options) -> Vec<u32> {
     numbers
 }
 
-pub fn print_issue_references(numbers: &[u32], width: usize, prefix: &str) {
+pub fn format_issue_references(numbers: &[u32], width: usize, prefix: &str) -> String {
     let mut lines = Vec::new();
 
     assert!(prefix.len() < width);
@@ -122,9 +122,13 @@ pub fn print_issue_references(numbers: &[u32], width: usize, prefix: &str) {
 
     lines.push(current_line);
 
+    let mut output = String::new();
     for line in lines {
-        println!("{line}");
+        output += &line;
+        output.push('\n');
     }
+
+    output
 }
 
 #[derive(Debug, Clone)]
