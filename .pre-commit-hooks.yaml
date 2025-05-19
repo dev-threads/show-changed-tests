@@ -1,0 +1,7 @@
+- id: show-changed-tests
+  name: "Show changed tests"
+  description: "Include tracking numbers of changed BDD scenarios"
+  entry: show-changed-tests
+  language: rust
+  stages: ["prepare-commit-msg"]
+
