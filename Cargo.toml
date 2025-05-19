@@ -1,7 +1,11 @@
 [package]
 name = "show-changed-tests"
 version = "0.1.0"
+description = "Githook to automatically fill in tracking numbers of changed test cases"
+readme = "README.md"
 edition = "2021"
+license = "GPL-3.0-only"
+repository = "https://github.com/dev-threads/show-changed-tests"
 
 [dependencies]
 clap = { version = "4.5.20", features = ["derive"] }
