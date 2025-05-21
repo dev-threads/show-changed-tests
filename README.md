@@ -101,3 +101,10 @@ repos:
     -   id: show-changed-tests
         args: ["--trailer=Issues", "--prefix=test:"]
 ```
+
+## Known issues
+
+Changes inside the tag list of a test scenario are not detected.
+For example if a test is tagged with `@tc:123`
+and this is changed to `@tc:456`,
+then neither number will appear in the commit message.
