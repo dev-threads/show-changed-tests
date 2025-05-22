@@ -108,3 +108,14 @@ Changes inside the tag list of a test scenario are not detected.
 For example if a test is tagged with `@tc:123`
 and this is changed to `@tc:456`,
 then neither number will appear in the commit message.
+
+## Troubleshooting
+
+### Installation via pre-commit fails
+
+When installing `show-changed-tests` via pre-commit, it is build from source.
+pre-commit will use the system Rust installation, if one is available.
+If this installation is outdated, then `show-changed-tests` may fail to build,
+Rust version 1.82 is required.
+
+In case of an old installation, run `rustup update`.
