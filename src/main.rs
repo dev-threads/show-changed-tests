@@ -6,7 +6,7 @@ use std::{
 
 use clap::Parser;
 use git2::Repository;
-use show_changed_tests::{changed_test_numbers, format_issue_references, Options};
+use show_changed_tests::{changed_test_numbers, extend_message, format_issue_references, Options};
 
 fn main() {
     let cli = Cli::parse();
@@ -38,25 +38,11 @@ fn main() {
     let mut message = String::new();
     msg_file.read_to_string(&mut message).unwrap();
 
-    let mut all_lines: Vec<_> = message.lines().collect();
-    let (last_empty, _) = all_lines
-        .iter()
-        .enumerate()
-        .rfind(|(_, line)| line.trim().is_empty())
-        .unwrap();
-
-    all_lines.insert(last_empty, &trailer);
-
-    let new_contents = all_lines
-        .into_iter()
-        .fold(String::new(), |mut contents, line| {
-            contents += &format!("{line}\n");
-            contents
-        });
+    let message = extend_message(&message, &trailer);
 
     msg_file.seek(SeekFrom::Start(0)).unwrap();
     msg_file.set_len(0).unwrap();
-    msg_file.write_all(new_contents.as_bytes()).unwrap();
+    msg_file.write_all(message.as_bytes()).unwrap();
 }
 
 #[derive(Debug, Parser, Clone)]

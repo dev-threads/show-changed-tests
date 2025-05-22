@@ -127,8 +127,35 @@ pub fn format_issue_references(numbers: &[u32], width: usize, prefix: &str) -> S
         output += &line;
         output.push('\n');
     }
+    // strip trailing newline
+    output.pop();
 
     output
+}
+
+/// Insert the trailer in the "correct" position of a commit message.
+///
+/// This is not strictly the end, as the message might contain instructions from git,
+/// and we want the trailer to appear before those.
+pub fn extend_message(message: &str, trailer: &str) -> String {
+    let mut all_lines: Vec<_> = message.lines().collect();
+    let (last_empty, _) = all_lines
+        .iter()
+        .enumerate()
+        .rfind(|(_, line)| line.trim().is_empty())
+        .unwrap_or((all_lines.len(), &""));
+
+    all_lines.insert(last_empty, &trailer);
+    all_lines.insert(last_empty, &"");
+
+    let new_contents = all_lines
+        .into_iter()
+        .fold(String::new(), |mut contents, line| {
+            contents += &format!("{line}\n");
+            contents
+        });
+
+    new_contents
 }
 
 #[derive(Debug, Clone)]
