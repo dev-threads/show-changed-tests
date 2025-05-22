@@ -67,7 +67,7 @@ show-changed-tests -- "$@"
 default_install_hook_types: [pre-commit, prepare-commit-msg]
 repos:
 -   repo: https://github.com/dev-threads/show-changed-tests
-    rev: v1.0.0
+    rev: v1.0.1
     hooks:
     -   id: show-changed-tests
 
@@ -96,7 +96,7 @@ If it is installed via pre-commit, use the `args` key:
 default_install_hook_types: [pre-commit, prepare-commit-msg]
 repos:
 -   repo: https://github.com/dev-threads/show-changed-tests
-    rev: v1.0.0
+    rev: v1.0.1
     hooks:
     -   id: show-changed-tests
         args: ["--trailer=Issues", "--prefix=test:"]
