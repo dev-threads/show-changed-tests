@@ -10,18 +10,31 @@ env:
 
 jobs:
   build:
-    runs-on: ${{matrix.os}}
+    runs-on: ${{matrix.os.runner}}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        os:
+        - name: Linux
+          runner: ubuntu-latest
+          artifact: "show-changed-tests"
+        - name: Windows
+          runner: windows-latest
+          artifact: "show-changed-tests.exe"
+        - name: MacOS
+          runner: macOS-latest
+          artifact: "show-changed-tests"
     steps:
     - uses: actions/checkout@v4
     - name: Build
       run: cargo build --release
+    - name: Package
+      run: |
+        cd target/release/
+        zip show-changed-tests-${{matrix.os.name}}.zip ${{matrix.os.artifact}}
     - uses: actions/upload-artifact@v4
       with:
-        name: build-${{matrix.os}}
-        path: target/release/show-changed-tests*
+        name: show-changed-tests-${{matrix.os.name}}
+        path: target/release/show-changed-tests-${{matrix.os.name}}.zip
   publish:
     needs:
     - build
@@ -29,7 +42,7 @@ jobs:
     steps:
     - uses: actions/download-artifact@v4
       with:
-        pattern: build-*
+        pattern: show-changed-tests-*
         path: artifacts
         merge-multiple: true
     - uses: ncipollo/release-action@v1
