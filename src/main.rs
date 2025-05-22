@@ -17,11 +17,10 @@ fn main() {
         Ok(num) => num,
         Err(err) => {
             eprintln!("Failed to detect changed tests!");
-            eprintln!("{err}"); 
+            eprintln!("{err}");
             return;
-        },
+        }
     };
-
 
     let trailer = format_issue_references(&numbers, 72, &format!("{}: ", cli.trailer));
 

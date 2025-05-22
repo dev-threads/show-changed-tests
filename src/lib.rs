@@ -1,4 +1,11 @@
-use std::{collections::BTreeSet, fmt::Display, fs::File, io::{self, Read}, ops::Range, path::PathBuf};
+use std::{
+    collections::BTreeSet,
+    fmt::Display,
+    fs::File,
+    io::{self, Read},
+    ops::Range,
+    path::PathBuf,
+};
 
 use gherkin::{Feature, Span};
 use git2::{Diff, DiffOptions, Repository};
@@ -16,7 +23,10 @@ pub enum ExtractNumberError {
     Io(io::Error),
 }
 
-pub fn changed_test_numbers(repo: &Repository, opts: &Options) -> Result<Vec<u32>, ExtractNumberError> {
+pub fn changed_test_numbers(
+    repo: &Repository,
+    opts: &Options,
+) -> Result<Vec<u32>, ExtractNumberError> {
     let mut diff_opts = DiffOptions::default();
     diff_opts.patience(true).context_lines(0);
 
@@ -58,7 +68,7 @@ pub fn changed_test_numbers(repo: &Repository, opts: &Options) -> Result<Vec<u32
 
         let Ok(feature) = Feature::parse(&text, Default::default()) else {
             eprintln!("Failed to parse gherkin file {}", change.path.display());
-            continue
+            continue;
         };
 
         let offsets = calculate_line_spans(&text);

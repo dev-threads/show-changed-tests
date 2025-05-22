@@ -6,39 +6,38 @@ fn check(message: &str, numbers: &[u32], expected: &str) {
     assert_eq!(&extend_message(message, &trailer), expected);
 }
 
-
 #[test]
 fn empty_message_works() {
     check(
-"",
+        "",
         &[123],
-"
+        "
 Tests: #123
-"
+",
     );
 }
 
 #[test]
 fn default_git_message() {
     check(
-"
+        "
 # Please enter the commit message for your changes. Lines starting
 # with '#' will be ignored, and an empty message aborts the commit.
 ",
         &[123],
-"
+        "
 Tests: #123
 
 # Please enter the commit message for your changes. Lines starting
 # with '#' will be ignored, and an empty message aborts the commit.
-"
+",
     );
 }
 
 #[test]
 fn message_with_template() {
     check(
-"<--- short issue description in 50 characters -->
+        "<--- short issue description in 50 characters -->
 
 <---   long issue description, keep it at 72 characters per line   --->
 
@@ -46,7 +45,7 @@ fn message_with_template() {
 # with '#' will be ignored, and an empty message aborts the commit.
 ",
         &[123],
-"<--- short issue description in 50 characters -->
+        "<--- short issue description in 50 characters -->
 
 <---   long issue description, keep it at 72 characters per line   --->
 
@@ -61,7 +60,7 @@ Tests: #123
 #[test]
 fn long_message_is_wrapped() {
     check(
-"<--- short issue description in 50 characters -->
+        "<--- short issue description in 50 characters -->
 
 <---   long issue description, keep it at 72 characters per line   --->
 
@@ -69,7 +68,7 @@ fn long_message_is_wrapped() {
 # with '#' will be ignored, and an empty message aborts the commit.
 ",
         &(10000..10025).collect::<Vec<_>>(),
-"<--- short issue description in 50 characters -->
+        "<--- short issue description in 50 characters -->
 
 <---   long issue description, keep it at 72 characters per line   --->
 
