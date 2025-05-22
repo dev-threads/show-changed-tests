@@ -165,8 +165,8 @@ pub fn extend_message(message: &str, trailer: &str) -> String {
         .rfind(|(_, line)| line.trim().is_empty())
         .unwrap_or((all_lines.len(), &""));
 
-    all_lines.insert(last_empty, &trailer);
-    all_lines.insert(last_empty, &"");
+    all_lines.insert(last_empty, trailer);
+    all_lines.insert(last_empty, "");
 
     let new_contents = all_lines
         .into_iter()
