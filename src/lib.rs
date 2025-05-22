@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, fs::File, io::Read, ops::Range, path::PathBuf};
+use std::{collections::BTreeSet, fmt::Display, fs::File, io::{self, Read}, ops::Range, path::PathBuf};
 
 use gherkin::{Feature, Span};
 use git2::{Diff, DiffOptions, Repository};
@@ -9,20 +9,27 @@ pub struct Options {
     pub test_prefix: String,
 }
 
-pub fn changed_test_numbers(repo: &Repository, opts: &Options) -> Vec<u32> {
+/// Possible errors that can happen when trying to figure out the changed tests.
+#[derive(Debug)]
+pub enum ExtractNumberError {
+    GitError,
+    Io(io::Error),
+}
+
+pub fn changed_test_numbers(repo: &Repository, opts: &Options) -> Result<Vec<u32>, ExtractNumberError> {
     let mut diff_opts = DiffOptions::default();
     diff_opts.patience(true).context_lines(0);
 
     let head = repo
         .resolve_reference_from_short_name("HEAD")
-        .unwrap()
+        .map_err(|_| ExtractNumberError::GitError)?
         .peel_to_commit()
-        .unwrap();
+        .map_err(|_| ExtractNumberError::GitError)?;
     let tree = head.tree().unwrap();
 
     let diff = repo
         .diff_tree_to_index(Some(&tree), None, Some(&mut diff_opts))
-        .unwrap();
+        .map_err(|_| ExtractNumberError::GitError)?;
 
     let changes = changes_in_tests(diff);
 
@@ -32,24 +39,27 @@ pub fn changed_test_numbers(repo: &Repository, opts: &Options) -> Vec<u32> {
         let text = if change.version == Version::Old {
             let blob = tree
                 .get_path(&change.path)
-                .unwrap()
+                .map_err(|_| ExtractNumberError::GitError)?
                 .to_object(repo)
-                .unwrap()
+                .map_err(|_| ExtractNumberError::GitError)?
                 .peel_to_blob()
-                .unwrap();
+                .map_err(|_| ExtractNumberError::GitError)?;
+
             let text = String::from_utf8_lossy(blob.content());
             text.to_string()
         } else {
             let full_path = repo.path().parent().unwrap().join(&change.path);
+
             let mut text = String::new();
-            File::open(&full_path)
-                .unwrap()
-                .read_to_string(&mut text)
-                .unwrap();
+            File::open(&full_path)?.read_to_string(&mut text)?;
+
             text
         };
 
-        let feature = Feature::parse(&text, Default::default()).unwrap();
+        let Ok(feature) = Feature::parse(&text, Default::default()) else {
+            eprintln!("Failed to parse gherkin file {}", change.path.display());
+            continue
+        };
 
         let offsets = calculate_line_spans(&text);
         let changed_line = line_to_byte_offset(offsets.clone(), change.line);
@@ -89,7 +99,7 @@ pub fn changed_test_numbers(repo: &Repository, opts: &Options) -> Vec<u32> {
         .into_iter()
         .collect();
 
-    numbers
+    Ok(numbers)
 }
 
 pub fn format_issue_references(numbers: &[u32], width: usize, prefix: &str) -> String {
@@ -276,3 +286,20 @@ impl Default for Options {
         }
     }
 }
+
+impl From<io::Error> for ExtractNumberError {
+    fn from(value: io::Error) -> Self {
+        ExtractNumberError::Io(value)
+    }
+}
+
+impl Display for ExtractNumberError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExtractNumberError::GitError => write!(f, "Failed to interact with git!"),
+            ExtractNumberError::Io(error) => write!(f, "IO Error: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for ExtractNumberError {}

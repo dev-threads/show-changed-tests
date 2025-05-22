@@ -11,7 +11,7 @@ fn check(files: &[(&'static str, &'static str)], numbers: &[u32]) {
     }
 
     assert_eq!(
-        &changed_test_numbers(repo.git_repo(), &Default::default()),
+        &changed_test_numbers(repo.git_repo(), &Default::default()).unwrap(),
         numbers
     );
 }
@@ -211,7 +211,7 @@ fn unstaged_changes_are_not_included() {
     repo.git(&["reset", "Unstaged.feature"]);
 
     assert_eq!(
-        changed_test_numbers(repo.git_repo(), &Default::default()),
+        changed_test_numbers(repo.git_repo(), &Default::default()).unwrap(),
         vec![111]
     );
 }
@@ -283,6 +283,29 @@ fn test_background_change_affects_all_scenarios() {
         ",
         )],
         &[111, 222, 333],
+    );
+}
+
+#[test]
+fn gracefully_handle_parse_errors() {
+    check(
+        &[(
+            "SimpleChange.feature",
+            "
+        Feature: Gracefully handle parse errors
+
+        Background:
+            Given a test scenario with number 12345
+
+        @tc:12345
+        Scenario: Parse error is fixed
+          -And it has a parse error
+          +Given the parse error is fixed
+          When the gherkin is fixed
+          Then 12345 is in the output
+        ",
+        )],
+        &[12345],
     );
 }
 

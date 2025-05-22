@@ -13,7 +13,16 @@ fn main() {
 
     let repo = Repository::open_from_env().unwrap();
 
-    let numbers = changed_test_numbers(&repo, &cli.clone().into());
+    let numbers = match changed_test_numbers(&repo, &cli.clone().into()) {
+        Ok(num) => num,
+        Err(err) => {
+            eprintln!("Failed to detect changed tests!");
+            eprintln!("{err}"); 
+            return;
+        },
+    };
+
+
     let trailer = format_issue_references(&numbers, 72, &format!("{}: ", cli.trailer));
 
     let Some(message_file) = cli.message_file else {
